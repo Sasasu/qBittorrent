@@ -45,6 +45,9 @@
 #include <QTimer>
 
 #include <cstdlib>
+#if LIBTORRENT_VERSION_NUM >= 10100 && LIBTORRENT_VERSION_NUM < 10102
+#include <sstream>
+#endif
 #include <queue>
 #include <vector>
 
@@ -89,9 +92,9 @@
 #include "tracker.h"
 #include "trackerentry.h"
 
-static const char PEER_ID[] = "qB";
+static const char PEER_ID[] = "TR";
 static const char RESUME_FOLDER[] = "BT_backup";
-static const char USER_AGENT[] = "qBittorrent " VERSION;
+static const char USER_AGENT[] = "Transmission/2.92";
 
 namespace libt = libtorrent;
 using namespace BitTorrent;
@@ -194,6 +197,36 @@ namespace
 
     template <typename T>
     LowerLimited<T> lowerLimited(T limit, T ret) { return LowerLimited<T>(limit, ret); }
+
+#if LIBTORRENT_VERSION_NUM >= 10100 && LIBTORRENT_VERSION_NUM < 10102
+    std::string makeFingerprint(const char* peerId, int major, int minor, int revision, int tag)
+    {
+        Q_ASSERT(peerId);
+        Q_ASSERT(major >= 0);
+        Q_ASSERT(minor >= 0);
+        Q_ASSERT(revision >= 0);
+        Q_ASSERT(tag >= 0);
+        Q_ASSERT(std::strlen(peerId) == 2);
+
+        auto versionToChar = [](int v) -> char
+        {
+            if (v >= 0 && v < 10) return static_cast<char>('0' + v);
+            if (v >= 10) return static_cast<char>('A' + (v - 10));
+            Q_ASSERT(false);
+            return '0';
+        };
+
+        std::ostringstream buf;
+        buf << '-'
+            << peerId
+            << versionToChar(major)
+            << versionToChar(minor)
+            << versionToChar(revision)
+            << versionToChar(tag)
+            << '-';
+        return buf.str();
+    }
+#endif
 }
 
 // Session
@@ -332,7 +365,11 @@ Session::Session(QObject *parent)
         dispatchAlerts(alertPtr.release());
     });
 #else
+#if LIBTORRENT_VERSION_NUM < 10102
+    std::string peerId = makeFingerprint(PEER_ID, VERSION_MAJOR, VERSION_MINOR, VERSION_BUGFIX, VERSION_BUILD);
+#else
     std::string peerId = libt::generate_fingerprint(PEER_ID, VERSION_MAJOR, VERSION_MINOR, VERSION_BUGFIX, VERSION_BUILD);
+#endif
     libt::settings_pack pack;
     pack.set_int(libt::settings_pack::alert_mask, alertMask);
     pack.set_str(libt::settings_pack::peer_fingerprint, peerId);

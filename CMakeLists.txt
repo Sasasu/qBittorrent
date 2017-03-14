@@ -17,15 +17,17 @@ endif()
 
 set(PROJECT_VERSION "${PROJECT_VERSION}${VER_STATUS}")
 
-add_definitions(-DVERSION_MAJOR=${VER_MAJOR})
-add_definitions(-DVERSION_MINOR=${VER_MINOR})
-add_definitions(-DVERSION_BUGFIX=${VER_BUGFIX})
-add_definitions(-DVERSION_BUILD=${VER_BUILD})
+add_definitions(-DQBT_VERSION_MAJOR=${VER_MAJOR})
+add_definitions(-DQBT_VERSION_MINOR=${VER_MINOR})
+add_definitions(-DQBT_VERSION_BUGFIX=${VER_BUGFIX})
+add_definitions(-DQBT_VERSION_BUILD=${VER_BUILD})
 
 # os2 {
-#     DEFINES += VERSION=\'\"v$${PROJECT_VERSION}\"\'
+#     DEFINES += DQBT_VERSION=\'\"v$${PROJECT_VERSION}\"\'
+#     DEFINES += DQBT_VERSION_2=\'\"$${PROJECT_VERSION}\"\'
 # } else {
-add_definitions(-DVERSION="v${PROJECT_VERSION}")
+add_definitions(-DQBT_VERSION="v${PROJECT_VERSION}")
+add_definitions(-DQBT_VERSION_2="${PROJECT_VERSION}")
 # }
 
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Og")
@@ -40,11 +42,8 @@ endif(WIN32)
 # we need options here, because they are used not only in "src" subdir, but in the "dist" dir too
 include(CMakeDependentOption)
 
-option(QT5 "Compile using Qt5" ON)
 option(SYSTEM_QTSINGLEAPPLICATION
     "Use the system qtsingleapplication library or shipped one otherwise")
-cmake_dependent_option(SYSTEM_QJSON
-    "Use the shipped qjson library or the system one (Qt4 only)" OFF "NOT QT5" OFF)
 
 option(GUI "Allows to disable GUI for headless running. Disables QtDBus and the GeoIP Database" ON)
 

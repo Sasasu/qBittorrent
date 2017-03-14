@@ -94,7 +94,11 @@
 
 static const char PEER_ID[] = "TR";
 static const char RESUME_FOLDER[] = "BT_backup";
+<<<<<<< HEAD
 static const char USER_AGENT[] = "Transmission/2.92";
+=======
+static const char USER_AGENT[] = "qBittorrent/" QBT_VERSION_2;
+>>>>>>> upstream/master
 
 namespace libt = libtorrent;
 using namespace BitTorrent;
@@ -373,10 +377,15 @@ Session::Session(QObject *parent)
         dispatchAlerts(alertPtr.release());
     });
 #else
+<<<<<<< HEAD
 #if LIBTORRENT_VERSION_NUM < 10102
     std::string peerId = makeFingerprint(PEER_ID, VERSION_MAJOR, VERSION_MINOR, VERSION_BUGFIX, VERSION_BUILD);
 #else
+    std::string peerId = libt::generate_fingerprint(PEER_ID, VERSION_MAJOR, VERSION_MINOR, VERSION_BUGFIX, VERSION_BUILD);
 #endif
+=======
+    std::string peerId = libt::generate_fingerprint(PEER_ID, QBT_VERSION_MAJOR, QBT_VERSION_MINOR, QBT_VERSION_BUGFIX, QBT_VERSION_BUILD);
+>>>>>>> upstream/master
     libt::settings_pack pack;
     pack.set_int(libt::settings_pack::alert_mask, alertMask);
     pack.set_str(libt::settings_pack::peer_fingerprint, peerId);

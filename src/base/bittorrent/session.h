@@ -57,6 +57,7 @@ namespace libtorrent
     struct torrent_handle;
     class entry;
     struct add_torrent_params;
+    struct ip_filter;
     struct pe_settings;
 #if LIBTORRENT_VERSION_NUM < 10100
     struct session_settings;
@@ -326,6 +327,8 @@ namespace BitTorrent
         void setUTPRateLimited(bool limited);
         bool isTrackerFilteringEnabled() const;
         void setTrackerFilteringEnabled(bool enabled);
+        QStringList bannedIPs() const;
+        void setBannedIPs(const QStringList &list);
 
         TorrentHandle *findTorrent(const InfoHash &hash) const;
         QHash<InfoHash, TorrentHandle *> torrents() const;
@@ -447,7 +450,7 @@ namespace BitTorrent
         void adjustLimits(libtorrent::settings_pack &settingsPack);
 #endif
         void adjustLimits();
-        void processBannedIPs();
+        void processBannedIPs(libtorrent::ip_filter &filter);
         const QStringList getListeningIPs();
         void configureListeningInterface();
         void changeSpeedLimitMode_impl(bool alternative);

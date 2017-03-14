@@ -1,6 +1,6 @@
 /*
  * Bittorrent Client using Qt and libtorrent.
- * Copyright (C) 2006  Christophe Dumez
+ * Copyright (C) 2016  Alexandr Milovantsev <dzmat@yandex.ru>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,47 +24,40 @@
  * modify file(s), you may extend this exception to your version of the file(s),
  * but you are not obligated to do so. If you do not wish to do so, delete this
  * exception statement from your version.
- *
- * Contact : chris@qbittorrent.org
  */
 
-#ifndef FILTERPARSERTHREAD_H
-#define FILTERPARSERTHREAD_H
+#ifndef OPTIONS_BANLIST_H
+#define OPTIONS_BANLIST_H
 
-#include <QThread>
+#include <QDialog>
 
-#include <libtorrent/ip_filter.hpp>
+class QSortFilterProxyModel;
+class QStringListModel;
 
-class QDataStream;
-class QStringList;
+namespace Ui
+{
+    class BanListOptions;
+}
 
-class FilterParserThread : public QThread
+class BanListOptions: public QDialog
 {
     Q_OBJECT
 
 public:
-    FilterParserThread(QObject *parent = 0);
-    ~FilterParserThread();
-    void processFilterFile(const QString &filePath);
-    libtorrent::ip_filter IPfilter();
+    explicit BanListOptions(QWidget *parent = 0);
+    ~BanListOptions();
 
-signals:
-    void IPFilterParsed(int ruleCount);
-    void IPFilterError();
-
-protected:
-    QString cleanupIPAddress(QString _ip);
-    void run();
+private slots:
+    void on_buttonBox_accepted();
+    void on_buttonBanIP_clicked();
+    void on_buttonDeleteIP_clicked();
+    void on_txtIP_textChanged(const QString &ip);
 
 private:
-    int parseDATFilterFile();
-    int parseP2PFilterFile();
-    int getlineInStream(QDataStream &stream, std::string &name, char delim);
-    int parseP2BFilterFile();
-
-    bool m_abort;
-    QString m_filePath;
-    libtorrent::ip_filter m_filter;
+    Ui::BanListOptions *m_ui;
+    QStringListModel *m_model;
+    QSortFilterProxyModel *m_sortFilter;
+    bool m_modified;
 };
 
-#endif // BITTORRENT_FILTERPARSERTHREAD_H
+#endif // OPTIONS_BANLIST_H

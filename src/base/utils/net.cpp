@@ -1,6 +1,6 @@
 /*
  * Bittorrent Client using Qt and libtorrent.
- * Copyright (C) 2014  Vladimir Golovnev
+ * Copyright (C) 2016  Alexandr Milovantsev <dzmat@yandex.ru>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,14 +24,19 @@
  * modify file(s), you may extend this exception to your version of the file(s),
  * but you are not obligated to do so. If you do not wish to do so, delete this
  * exception statement from your version.
- *
- * Contact : glassez@yandex.ru
  */
 
-#ifndef QJSON_EXPORT_H
-#define QJSON_EXPORT_H
+#include "net.h"
+#include <QHostAddress>
+#include <QString>
 
-#include <qglobal.h>
-#define QJSON_EXPORT
-
-#endif
+namespace Utils
+{
+    namespace Net
+    {
+        bool isValidIP(const QString &ip)
+        {
+            return !QHostAddress(ip).isNull();
+        }
+    }
+}

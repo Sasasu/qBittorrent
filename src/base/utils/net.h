@@ -1,6 +1,6 @@
 /*
  * Bittorrent Client using Qt and libtorrent.
- * Copyright (C) 2006  Christophe Dumez
+ * Copyright (C) 2016  Alexandr Milovantsev <dzmat@yandex.ru>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,47 +24,18 @@
  * modify file(s), you may extend this exception to your version of the file(s),
  * but you are not obligated to do so. If you do not wish to do so, delete this
  * exception statement from your version.
- *
- * Contact : chris@qbittorrent.org
  */
 
-#ifndef FILTERPARSERTHREAD_H
-#define FILTERPARSERTHREAD_H
+#ifndef BASE_UTILS_NET_H
+#define BASE_UTILS_NET_H
+class QString;
 
-#include <QThread>
-
-#include <libtorrent/ip_filter.hpp>
-
-class QDataStream;
-class QStringList;
-
-class FilterParserThread : public QThread
+namespace Utils
 {
-    Q_OBJECT
+    namespace Net
+    {
+        bool isValidIP(const QString &ip);
+    }
+}
 
-public:
-    FilterParserThread(QObject *parent = 0);
-    ~FilterParserThread();
-    void processFilterFile(const QString &filePath);
-    libtorrent::ip_filter IPfilter();
-
-signals:
-    void IPFilterParsed(int ruleCount);
-    void IPFilterError();
-
-protected:
-    QString cleanupIPAddress(QString _ip);
-    void run();
-
-private:
-    int parseDATFilterFile();
-    int parseP2PFilterFile();
-    int getlineInStream(QDataStream &stream, std::string &name, char delim);
-    int parseP2BFilterFile();
-
-    bool m_abort;
-    QString m_filePath;
-    libtorrent::ip_filter m_filter;
-};
-
-#endif // BITTORRENT_FILTERPARSERTHREAD_H
+#endif // BASE_UTILS_NET_H

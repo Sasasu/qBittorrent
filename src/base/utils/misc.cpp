@@ -35,8 +35,7 @@
 #include <QByteArray>
 #include <QDebug>
 #include <QProcess>
-#include <QSettings>
-#include <QThread>
+#include <QRegularExpression>
 #include <QSysInfo>
 #include <boost/version.hpp>
 #include <libtorrent/version.hpp>
@@ -220,21 +219,15 @@ void Utils::Misc::shutdownComputer(const ShutdownDialogAction &action)
 }
 
 #ifndef DISABLE_GUI
-// Get screen center
-QPoint Utils::Misc::screenCenter(QWidget *win)
+QPoint Utils::Misc::screenCenter(const QWidget *w)
 {
-    int scrn = 0;
-    const QWidget *w = win->window();
+    // Returns the QPoint which the widget will be placed center on screen (where parent resides)
 
-    if (w)
-        scrn = QApplication::desktop()->screenNumber(w);
-    else if (QApplication::desktop()->isVirtualDesktop())
-        scrn = QApplication::desktop()->screenNumber(QCursor::pos());
-    else
-        scrn = QApplication::desktop()->screenNumber(win);
-
-    QRect desk(QApplication::desktop()->availableGeometry(scrn));
-    return QPoint((desk.width() - win->frameGeometry().width()) / 2, (desk.height() - win->frameGeometry().height()) / 2);
+    QWidget *parent = w->parentWidget();
+    QDesktopWidget *desktop = QApplication::desktop();
+    int scrn = desktop->screenNumber(parent);  // fallback to `primaryScreen` when parent is invalid
+    QRect r = desktop->availableGeometry(scrn);
+    return QPoint(r.x() + (r.width() - w->frameSize().width()) / 2, r.y() + (r.height() - w->frameSize().height()) / 2);
 }
 
 #endif
@@ -313,10 +306,23 @@ QString Utils::Misc::pythonVersionComplete()
             // Software 'Anaconda' installs its own python interpreter
             // and `python --version` returns a string like this:
             // `Python 3.4.3 :: Anaconda 2.3.0 (64-bit)`
-            const QList<QByteArray> verSplit = output.split(' ');
-            if (verSplit.size() > 1) {
-                version = verSplit.at(1).trimmed();
+            const QList<QByteArray> outSplit = output.split(' ');
+            if (outSplit.size() > 1) {
+                version = outSplit.at(1).trimmed();
                 Logger::instance()->addMessage(QCoreApplication::translate("misc", "Python version: %1").arg(version), Log::INFO);
+            }
+
+            // If python doesn't report a 3-piece version e.g. 3.6.1
+            // then fill the missing pieces with zero
+            const QStringList verSplit = version.split('.', QString::SkipEmptyParts);
+            if (verSplit.size() < 3) {
+                for (int i = verSplit.size(); i < 3; ++i) {
+                    if (version.endsWith('.'))
+                        version.append('0');
+                    else
+                        version.append(".0");
+                }
+                Logger::instance()->addMessage(QCoreApplication::translate("misc", "Normalized Python version: %1").arg(version), Log::INFO);
             }
         }
     }
@@ -504,9 +510,10 @@ QList<bool> Utils::Misc::boolListfromStringList(const QStringList &l)
 
 bool Utils::Misc::isUrl(const QString &s)
 {
-    const QString scheme = QUrl(s).scheme();
-    QRegExp is_url("http[s]?|ftp", Qt::CaseInsensitive);
-    return is_url.exactMatch(scheme);
+    static const QRegularExpression reURLScheme(
+                "http[s]?|ftp", QRegularExpression::CaseInsensitiveOption);
+
+    return reURLScheme.match(QUrl(s).scheme()).hasMatch();
 }
 
 QString Utils::Misc::parseHtmlLinks(const QString &raw_text)
@@ -639,24 +646,6 @@ QSize Utils::Misc::largeIconSize()
     return QSize(s, s);
 }
 #endif // DISABLE_GUI
-
-namespace
-{
-    //  Trick to get a portable sleep() function
-    class SleeperThread: public QThread
-    {
-    public:
-        static void msleep(unsigned long msecs)
-        {
-            QThread::msleep(msecs);
-        }
-    };
-}
-
-void Utils::Misc::msleep(unsigned long msecs)
-{
-    SleeperThread::msleep(msecs);
-}
 
 QString Utils::Misc::osName()
 {

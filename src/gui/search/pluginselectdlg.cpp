@@ -29,6 +29,8 @@
  * Contact : chris@qbittorrent.org
  */
 
+#include "pluginselectdlg.h"
+
 #include <QHeaderView>
 #include <QMenu>
 #include <QMessageBox>
@@ -37,18 +39,17 @@
 #include <QMimeData>
 #include <QClipboard>
 #include <QTableView>
+#include <QImageReader>
 
 #include "base/utils/fs.h"
 #include "base/utils/misc.h"
 #include "base/net/downloadmanager.h"
 #include "base/net/downloadhandler.h"
-#include "base/searchengine.h"
-#include "ico.h"
 #include "searchwidget.h"
 #include "pluginsourcedlg.h"
 #include "guiiconprovider.h"
 #include "autoexpandabledialog.h"
-#include "pluginselectdlg.h"
+#include "ui_pluginselectdlg.h"
 
 enum PluginColumns
 {
@@ -61,46 +62,48 @@ enum PluginColumns
 
 PluginSelectDlg::PluginSelectDlg(SearchEngine *pluginManager, QWidget *parent)
     : QDialog(parent)
+    , m_ui(new Ui::PluginSelectDlg())
     , m_pluginManager(pluginManager)
     , m_asyncOps(0)
+    , m_pendingUpdates(0)
 {
-    setupUi(this);
+    m_ui->setupUi(this);
     setAttribute(Qt::WA_DeleteOnClose);
 
     // This hack fixes reordering of first column with Qt5.
     // https://github.com/qtproject/qtbase/commit/e0fc088c0c8bc61dbcaf5928b24986cd61a22777
     QTableView unused;
-    unused.setVerticalHeader(pluginsTree->header());
-    pluginsTree->header()->setParent(pluginsTree);
+    unused.setVerticalHeader(m_ui->pluginsTree->header());
+    m_ui->pluginsTree->header()->setParent(m_ui->pluginsTree);
     unused.setVerticalHeader(new QHeaderView(Qt::Horizontal));
 
-    pluginsTree->setRootIsDecorated(false);
-    pluginsTree->header()->resizeSection(0, 160);
-    pluginsTree->header()->resizeSection(1, 80);
-    pluginsTree->header()->resizeSection(2, 200);
-    pluginsTree->hideColumn(PLUGIN_ID);
+    m_ui->pluginsTree->setRootIsDecorated(false);
+    m_ui->pluginsTree->header()->resizeSection(0, 160);
+    m_ui->pluginsTree->header()->resizeSection(1, 80);
+    m_ui->pluginsTree->header()->resizeSection(2, 200);
+    m_ui->pluginsTree->hideColumn(PLUGIN_ID);
 
-    actionUninstall->setIcon(GuiIconProvider::instance()->getIcon("list-remove"));
+    m_ui->actionUninstall->setIcon(GuiIconProvider::instance()->getIcon("list-remove"));
 
-    connect(actionEnable, SIGNAL(toggled(bool)), this, SLOT(enableSelection(bool)));
-    connect(pluginsTree, SIGNAL(customContextMenuRequested(const QPoint&)), this, SLOT(displayContextMenu(const QPoint&)));
-    connect(pluginsTree, SIGNAL(itemDoubleClicked(QTreeWidgetItem*, int)), this, SLOT(togglePluginState(QTreeWidgetItem*, int)));
+    connect(m_ui->actionEnable, &QAction::toggled, this, &PluginSelectDlg::enableSelection);
+    connect(m_ui->pluginsTree, &QTreeWidget::customContextMenuRequested, this, &PluginSelectDlg::displayContextMenu);
+    connect(m_ui->pluginsTree, &QTreeWidget::itemDoubleClicked, this, &PluginSelectDlg::togglePluginState);
 
     loadSupportedSearchPlugins();
 
-    connect(m_pluginManager, SIGNAL(pluginInstalled(QString)), SLOT(pluginInstalled(QString)));
-    connect(m_pluginManager, SIGNAL(pluginInstallationFailed(QString, QString)), SLOT(pluginInstallationFailed(QString, QString)));
-    connect(m_pluginManager, SIGNAL(pluginUpdated(QString)), SLOT(pluginUpdated(QString)));
-    connect(m_pluginManager, SIGNAL(pluginUpdateFailed(QString, QString)), SLOT(pluginUpdateFailed(QString, QString)));
-    connect(m_pluginManager, SIGNAL(checkForUpdatesFinished(QHash<QString, qreal>)), SLOT(checkForUpdatesFinished(QHash<QString, qreal>)));
-    connect(m_pluginManager, SIGNAL(checkForUpdatesFailed(QString)), SLOT(checkForUpdatesFailed(QString)));
+    connect(m_pluginManager, &SearchEngine::pluginInstalled, this, &PluginSelectDlg::pluginInstalled);
+    connect(m_pluginManager, &SearchEngine::pluginInstallationFailed, this, &PluginSelectDlg::pluginInstallationFailed);
+    connect(m_pluginManager, &SearchEngine::pluginUpdated, this, &PluginSelectDlg::pluginUpdated);
+    connect(m_pluginManager, &SearchEngine::pluginUpdateFailed, this, &PluginSelectDlg::pluginUpdateFailed);
+    connect(m_pluginManager, &SearchEngine::checkForUpdatesFinished, this, &PluginSelectDlg::checkForUpdatesFinished);
+    connect(m_pluginManager, &SearchEngine::checkForUpdatesFailed, this, &PluginSelectDlg::checkForUpdatesFailed);
 
     show();
 }
 
 PluginSelectDlg::~PluginSelectDlg()
 {
-    emit pluginsChanged();
+    delete m_ui;
 }
 
 void PluginSelectDlg::dropEvent(QDropEvent *event)
@@ -156,11 +159,11 @@ void PluginSelectDlg::togglePluginState(QTreeWidgetItem *item, int)
     m_pluginManager->enablePlugin(plugin->name, !plugin->enabled);
     if (plugin->enabled) {
         item->setText(PLUGIN_STATE, tr("Yes"));
-        setRowColor(pluginsTree->indexOfTopLevelItem(item), "green");
+        setRowColor(m_ui->pluginsTree->indexOfTopLevelItem(item), "green");
     }
     else {
         item->setText(PLUGIN_STATE, tr("No"));
-        setRowColor(pluginsTree->indexOfTopLevelItem(item), "red");
+        setRowColor(m_ui->pluginsTree->indexOfTopLevelItem(item), "red");
     }
 }
 
@@ -168,14 +171,14 @@ void PluginSelectDlg::displayContextMenu(const QPoint&)
 {
     QMenu myContextMenu(this);
     // Enable/disable pause/start action given the DL state
-    QList<QTreeWidgetItem *> items = pluginsTree->selectedItems();
+    QList<QTreeWidgetItem *> items = m_ui->pluginsTree->selectedItems();
     if (items.isEmpty()) return;
 
     QString first_id = items.first()->text(PLUGIN_ID);
-    actionEnable->setChecked(m_pluginManager->pluginInfo(first_id)->enabled);
-    myContextMenu.addAction(actionEnable);
+    m_ui->actionEnable->setChecked(m_pluginManager->pluginInfo(first_id)->enabled);
+    myContextMenu.addAction(m_ui->actionEnable);
     myContextMenu.addSeparator();
-    myContextMenu.addAction(actionUninstall);
+    myContextMenu.addAction(m_ui->actionUninstall);
     myContextMenu.exec(QCursor::pos());
 }
 
@@ -187,8 +190,8 @@ void PluginSelectDlg::on_closeButton_clicked()
 void PluginSelectDlg::on_actionUninstall_triggered()
 {
     bool error = false;
-    foreach (QTreeWidgetItem *item, pluginsTree->selectedItems()) {
-        int index = pluginsTree->indexOfTopLevelItem(item);
+    foreach (QTreeWidgetItem *item, m_ui->pluginsTree->selectedItems()) {
+        int index = m_ui->pluginsTree->indexOfTopLevelItem(item);
         Q_ASSERT(index != -1);
         QString id = item->text(PLUGIN_ID);
         if (m_pluginManager->uninstallPlugin(id)) {
@@ -204,15 +207,15 @@ void PluginSelectDlg::on_actionUninstall_triggered()
     }
 
     if (error)
-        QMessageBox::warning(0, tr("Uninstall warning"), tr("Some plugins could not be uninstalled because they are included in qBittorrent. Only the ones you added yourself can be uninstalled.\nThose plugins were disabled."));
+        QMessageBox::warning(this, tr("Uninstall warning"), tr("Some plugins could not be uninstalled because they are included in qBittorrent. Only the ones you added yourself can be uninstalled.\nThose plugins were disabled."));
     else
-        QMessageBox::information(0, tr("Uninstall success"), tr("All selected plugins were uninstalled successfully"));
+        QMessageBox::information(this, tr("Uninstall success"), tr("All selected plugins were uninstalled successfully"));
 }
 
 void PluginSelectDlg::enableSelection(bool enable)
 {
-    foreach (QTreeWidgetItem *item, pluginsTree->selectedItems()) {
-        int index = pluginsTree->indexOfTopLevelItem(item);
+    foreach (QTreeWidgetItem *item, m_ui->pluginsTree->selectedItems()) {
+        int index = m_ui->pluginsTree->indexOfTopLevelItem(item);
         Q_ASSERT(index != -1);
         QString id = item->text(PLUGIN_ID);
         m_pluginManager->enablePlugin(id, enable);
@@ -230,8 +233,8 @@ void PluginSelectDlg::enableSelection(bool enable)
 // Set the color of a row in data model
 void PluginSelectDlg::setRowColor(int row, QString color)
 {
-    QTreeWidgetItem *item = pluginsTree->topLevelItem(row);
-    for (int i = 0; i < pluginsTree->columnCount(); ++i) {
+    QTreeWidgetItem *item = m_ui->pluginsTree->topLevelItem(row);
+    for (int i = 0; i < m_ui->pluginsTree->columnCount(); ++i) {
         item->setData(i, Qt::ForegroundRole, QVariant(QColor(color)));
     }
 }
@@ -240,8 +243,8 @@ QList<QTreeWidgetItem*> PluginSelectDlg::findItemsWithUrl(QString url)
 {
     QList<QTreeWidgetItem*> res;
 
-    for (int i = 0; i < pluginsTree->topLevelItemCount(); ++i) {
-        QTreeWidgetItem *item = pluginsTree->topLevelItem(i);
+    for (int i = 0; i < m_ui->pluginsTree->topLevelItemCount(); ++i) {
+        QTreeWidgetItem *item = m_ui->pluginsTree->topLevelItem(i);
         if (url.startsWith(item->text(PLUGIN_URL), Qt::CaseInsensitive))
             res << item;
     }
@@ -251,8 +254,8 @@ QList<QTreeWidgetItem*> PluginSelectDlg::findItemsWithUrl(QString url)
 
 QTreeWidgetItem* PluginSelectDlg::findItemWithID(QString id)
 {
-    for (int i = 0; i < pluginsTree->topLevelItemCount(); ++i) {
-        QTreeWidgetItem *item = pluginsTree->topLevelItem(i);
+    for (int i = 0; i < m_ui->pluginsTree->topLevelItemCount(); ++i) {
+        QTreeWidgetItem *item = m_ui->pluginsTree->topLevelItem(i);
         if (id == item->text(PLUGIN_ID))
             return item;
     }
@@ -263,25 +266,25 @@ QTreeWidgetItem* PluginSelectDlg::findItemWithID(QString id)
 void PluginSelectDlg::loadSupportedSearchPlugins()
 {
     // Some clean up first
-    pluginsTree->clear();
+    m_ui->pluginsTree->clear();
     foreach (QString name, m_pluginManager->allPlugins())
         addNewPlugin(name);
 }
 
 void PluginSelectDlg::addNewPlugin(QString pluginName)
 {
-    QTreeWidgetItem *item = new QTreeWidgetItem(pluginsTree);
+    QTreeWidgetItem *item = new QTreeWidgetItem(m_ui->pluginsTree);
     PluginInfo *plugin = m_pluginManager->pluginInfo(pluginName);
     item->setText(PLUGIN_NAME, plugin->fullName);
     item->setText(PLUGIN_URL, plugin->url);
     item->setText(PLUGIN_ID, plugin->name);
     if (plugin->enabled) {
         item->setText(PLUGIN_STATE, tr("Yes"));
-        setRowColor(pluginsTree->indexOfTopLevelItem(item), "green");
+        setRowColor(m_ui->pluginsTree->indexOfTopLevelItem(item), "green");
     }
     else {
         item->setText(PLUGIN_STATE, tr("No"));
-        setRowColor(pluginsTree->indexOfTopLevelItem(item), "red");
+        setRowColor(m_ui->pluginsTree->indexOfTopLevelItem(item), "red");
     }
     // Handle icon
     if (QFile::exists(plugin->iconPath)) {
@@ -290,11 +293,13 @@ void PluginSelectDlg::addNewPlugin(QString pluginName)
     }
     else {
         // Icon is missing, we must download it
-        Net::DownloadHandler *handler = Net::DownloadManager::instance()->downloadUrl(plugin->url + "/favicon.ico", true);
-        connect(handler, SIGNAL(downloadFinished(QString, QString)), this, SLOT(iconDownloaded(QString, QString)));
-        connect(handler, SIGNAL(downloadFailed(QString, QString)), this, SLOT(iconDownloadFailed(QString, QString)));
+        using namespace Net;
+        DownloadHandler *handler = DownloadManager::instance()->downloadUrl(plugin->url + "/favicon.ico", true);
+        connect(handler, static_cast<void (DownloadHandler::*)(const QString &, const QString &)>(&DownloadHandler::downloadFinished)
+                , this, &PluginSelectDlg::iconDownloaded);
+        connect(handler, &DownloadHandler::downloadFailed, this, &PluginSelectDlg::iconDownloadFailed);
     }
-    item->setText(PLUGIN_VERSION, QString::number(plugin->version, 'f', 2));
+    item->setText(PLUGIN_VERSION, plugin->version);
 }
 
 void PluginSelectDlg::startAsyncOp()
@@ -311,11 +316,21 @@ void PluginSelectDlg::finishAsyncOp()
         setCursor(QCursor(Qt::ArrowCursor));
 }
 
+void PluginSelectDlg::finishPluginUpdate()
+{
+    --m_pendingUpdates;
+    if (m_pendingUpdates == 0 && !m_updatedPlugins.isEmpty()) {
+        m_updatedPlugins.sort(Qt::CaseInsensitive);
+        QMessageBox::information(this, tr("Search plugin update"), tr("Plugins installed or updated: %1").arg(m_updatedPlugins.join(", ")));
+        m_updatedPlugins.clear();
+    }
+}
+
 void PluginSelectDlg::on_installButton_clicked()
 {
     PluginSourceDlg *dlg = new PluginSourceDlg(this);
-    connect(dlg, SIGNAL(askForLocalFile()), this, SLOT(askForLocalPlugin()));
-    connect(dlg, SIGNAL(askForUrl()), this, SLOT(askForPluginUrl()));
+    connect(dlg, &PluginSourceDlg::askForLocalFile, this, &PluginSelectDlg::askForLocalPlugin);
+    connect(dlg, &PluginSourceDlg::askForUrl, this, &PluginSelectDlg::askForPluginUrl);
 }
 
 void PluginSelectDlg::askForPluginUrl()
@@ -361,18 +376,35 @@ void PluginSelectDlg::iconDownloaded(const QString &url, QString filePath)
     filePath = Utils::Fs::fromNativePath(filePath);
 
     // Icon downloaded
-    QImage fileIcon;
-    if (fileIcon.load(filePath)) {
+    QIcon icon(filePath);
+    // Detect a non-decodable icon
+    QList<QSize> sizes = icon.availableSizes();
+    bool invalid = (sizes.isEmpty() || icon.pixmap(sizes.first()).isNull());
+    if (!invalid) {
         foreach (QTreeWidgetItem *item, findItemsWithUrl(url)) {
             QString id = item->text(PLUGIN_ID);
             PluginInfo *plugin = m_pluginManager->pluginInfo(id);
             if (!plugin) continue;
 
-            QFile icon(filePath);
-            icon.open(QIODevice::ReadOnly);
-            QString iconPath = QString("%1/%2.%3").arg(SearchEngine::pluginsLocation()).arg(id).arg(ICOHandler::canRead(&icon) ? "ico" : "png");
-            if (QFile::copy(filePath, iconPath))
-                item->setData(PLUGIN_NAME, Qt::DecorationRole, QVariant(QIcon(iconPath)));
+            QString iconPath = QString("%1/%2.%3")
+                               .arg(SearchEngine::pluginsLocation())
+                               .arg(id)
+                               .arg(url.endsWith(".ico", Qt::CaseInsensitive) ? "ico" : "png");
+            if (QFile::copy(filePath, iconPath)) {
+                // This 2nd check is necessary. Some favicons (eg from piratebay)
+                // decode fine without an ext, but fail to do so when appending the ext
+                // from the url. Probably a Qt bug.
+                QIcon iconWithExt(iconPath);
+                QList<QSize> sizesExt = iconWithExt.availableSizes();
+                bool invalidExt = (sizesExt.isEmpty() || iconWithExt.pixmap(sizesExt.first()).isNull());
+                if (invalidExt) {
+                    Utils::Fs::forceRemove(iconPath);
+                    continue;
+                }
+
+                item->setData(PLUGIN_NAME, Qt::DecorationRole, iconWithExt);
+                m_pluginManager->updateIconPath(plugin);
+            }
         }
     }
     // Delete tmp file
@@ -384,7 +416,7 @@ void PluginSelectDlg::iconDownloadFailed(const QString &url, const QString &reas
     qDebug("Could not download favicon: %s, reason: %s", qPrintable(url), qPrintable(reason));
 }
 
-void PluginSelectDlg::checkForUpdatesFinished(const QHash<QString, qreal> &updateInfo)
+void PluginSelectDlg::checkForUpdatesFinished(const QHash<QString, PluginVersion> &updateInfo)
 {
     finishAsyncOp();
     if (updateInfo.isEmpty()) {
@@ -394,6 +426,7 @@ void PluginSelectDlg::checkForUpdatesFinished(const QHash<QString, qreal> &updat
 
     foreach (const QString &pluginName, updateInfo.keys()) {
         startAsyncOp();
+        m_pendingUpdates++;
         m_pluginManager->updatePlugin(pluginName);
     }
 }
@@ -408,27 +441,30 @@ void PluginSelectDlg::pluginInstalled(const QString &name)
 {
     addNewPlugin(name);
     finishAsyncOp();
-    QMessageBox::information(this, tr("Search plugin install"), tr("\"%1\" search engine plugin was successfully installed.", "%1 is the name of the search engine").arg(name));
+    m_updatedPlugins.append(name);
+    finishPluginUpdate();
 }
 
 void PluginSelectDlg::pluginInstallationFailed(const QString &name, const QString &reason)
 {
     finishAsyncOp();
     QMessageBox::information(this, tr("Search plugin install"), tr("Couldn't install \"%1\" search engine plugin. %2").arg(name).arg(reason));
+    finishPluginUpdate();
 }
 
 void PluginSelectDlg::pluginUpdated(const QString &name)
 {
     finishAsyncOp();
-    qreal version = m_pluginManager->pluginInfo(name)->version;
+    PluginVersion version = m_pluginManager->pluginInfo(name)->version;
     QTreeWidgetItem *item = findItemWithID(name);
-    item->setText(PLUGIN_VERSION, QString::number(version, 'f', 2));
-    QMessageBox::information(this, tr("Search plugin install"), tr("\"%1\" search engine plugin was successfully updated.", "%1 is the name of the search engine").arg(name));
-
+    item->setText(PLUGIN_VERSION, version);
+    m_updatedPlugins.append(name);
+    finishPluginUpdate();
 }
 
 void PluginSelectDlg::pluginUpdateFailed(const QString &name, const QString &reason)
 {
     finishAsyncOp();
     QMessageBox::information(this, tr("Search plugin update"), tr("Couldn't update \"%1\" search engine plugin. %2").arg(name).arg(reason));
+    finishPluginUpdate();
 }

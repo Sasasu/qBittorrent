@@ -63,6 +63,7 @@
 #include "base/logger.h"
 #include "base/preferences.h"
 #include "base/settingsstorage.h"
+#include "base/profile.h"
 #include "base/utils/fs.h"
 #include "base/utils/misc.h"
 #include "base/iconprovider.h"
@@ -73,6 +74,8 @@
 #include "base/net/proxyconfigurationmanager.h"
 #include "base/bittorrent/session.h"
 #include "base/bittorrent/torrenthandle.h"
+#include "base/rss/rss_autodownloader.h"
+#include "base/rss/rss_session.h"
 
 namespace
 {
@@ -93,33 +96,46 @@ namespace
 
     const QString LOG_FOLDER("logs");
     const char PARAMS_SEPARATOR[] = "|";
+
+    const QString DEFAULT_PORTABLE_MODE_PROFILE_DIR = QLatin1String("profile");
 }
 
 Application::Application(const QString &id, int &argc, char **argv)
     : BaseApplication(id, argc, argv)
     , m_running(false)
     , m_shutdownAct(ShutdownDialogAction::Exit)
+    , m_commandLineArgs(parseCommandLine(this->arguments()))
 {
+    qRegisterMetaType<Log::Msg>("Log::Msg");
+
+    setApplicationName("qBittorrent");
+    validateCommandLineParameters();
+
+    QString profileDir = m_commandLineArgs.portableMode
+        ? QDir(QCoreApplication::applicationDirPath()).absoluteFilePath(DEFAULT_PORTABLE_MODE_PROFILE_DIR)
+        : m_commandLineArgs.profileDir;
+
+    Profile::initialize(profileDir, m_commandLineArgs.configurationName,
+                        m_commandLineArgs.relativeFastresumePaths || m_commandLineArgs.portableMode);
+
     Logger::initInstance();
     SettingsStorage::initInstance();
     Preferences::initInstance();
 
-#if defined(Q_OS_MACX) && !defined(DISABLE_GUI)
-    if (QSysInfo::MacintoshVersion > QSysInfo::MV_10_8) {
-        // fix Mac OS X 10.9 (mavericks) font issue
-        // https://bugreports.qt-project.org/browse/QTBUG-32789
-        QFont::insertSubstitution(".Lucida Grande UI", "Lucida Grande");
-    }
-#endif
+    if (m_commandLineArgs.webUiPort > 0) // it will be -1 when user did not set any value
+        Preferences::instance()->setWebUiPort(m_commandLineArgs.webUiPort);
+
     setApplicationName("qBittorrent");
     initializeTranslation();
-#ifndef DISABLE_GUI
+
+#if !defined(DISABLE_GUI)
     setAttribute(Qt::AA_UseHighDpiPixmaps, true);  // opt-in to the high DPI pixmap support
     setQuitOnLastWindowClosed(false);
-#ifdef Q_OS_WIN
+#endif
+
+#if defined(Q_OS_WIN) && !defined(DISABLE_GUI)
     connect(this, SIGNAL(commitDataRequest(QSessionManager &)), this, SLOT(shutdownCleanup(QSessionManager &)), Qt::DirectConnection);
-#endif // Q_OS_WIN
-#endif // DISABLE_GUI
+#endif
 
     connect(this, SIGNAL(messageReceived(const QString &)), SLOT(processMessage(const QString &)));
     connect(this, SIGNAL(aboutToQuit()), SLOT(cleanup()));
@@ -137,6 +153,11 @@ QPointer<MainWindow> Application::mainWindow()
 }
 #endif
 
+const QBtCommandLineParameters &Application::commandLineArgs() const
+{
+    return m_commandLineArgs;
+}
+
 bool Application::isFileLoggerEnabled() const
 {
     return settings()->loadValue(KEY_FILELOGGER_ENABLED, true).toBool();
@@ -153,14 +174,15 @@ void Application::setFileLoggerEnabled(bool value)
 
 QString Application::fileLoggerPath() const
 {
-    return settings()->loadValue(KEY_FILELOGGER_PATH, QVariant(Utils::Fs::QDesktopServicesDataLocation() + LOG_FOLDER)).toString();
+    return settings()->loadValue(KEY_FILELOGGER_PATH,
+            QVariant(specialFolderLocation(SpecialFolder::Data) + LOG_FOLDER)).toString();
 }
 
-void Application::setFileLoggerPath(const QString &value)
+void Application::setFileLoggerPath(const QString &path)
 {
     if (m_fileLogger)
-        m_fileLogger->changePath(value);
-    settings()->storeValue(KEY_FILELOGGER_PATH, value);
+        m_fileLogger->changePath(path);
+    settings()->storeValue(KEY_FILELOGGER_PATH, path);
 }
 
 bool Application::isFileLoggerBackup() const
@@ -344,7 +366,7 @@ void Application::allTorrentsFinished()
         // do nothing & skip confirm
     }
     else {
-        if (!ShutdownConfirmDlg::askForConfirmation(action)) return;
+        if (!ShutdownConfirmDlg::askForConfirmation(m_window, action)) return;
     }
 #endif // DISABLE_GUI
 
@@ -380,15 +402,63 @@ void Application::processParams(const QStringList &params)
         return;
     }
 #endif
+    BitTorrent::AddTorrentParams torrentParams;
+    TriStateBool skipTorrentDialog;
 
     foreach (QString param, params) {
         param = param.trimmed();
+
+        // Process strings indicating options specified by the user.
+
+        if (param.startsWith(QLatin1String("@savePath="))) {
+            torrentParams.savePath = param.mid(10);
+            continue;
+        }
+
+        if (param.startsWith(QLatin1String("@addPaused="))) {
+            torrentParams.addPaused = param.mid(11).toInt() ? TriStateBool::True : TriStateBool::False;
+            continue;
+        }
+
+        if (param == QLatin1String("@skipChecking")) {
+            torrentParams.skipChecking = true;
+            continue;
+        }
+
+        if (param.startsWith(QLatin1String("@category="))) {
+            torrentParams.category = param.mid(10);
+            continue;
+        }
+
+        if (param == QLatin1String("@sequential")) {
+            torrentParams.sequential = true;
+            continue;
+        }
+
+        if (param == QLatin1String("@firstLastPiecePriority")) {
+            torrentParams.firstLastPiecePriority = true;
+            continue;
+        }
+
+        if (param.startsWith(QLatin1String("@skipDialog="))) {
+            skipTorrentDialog = param.mid(12).toInt() ? TriStateBool::True : TriStateBool::False;
+            continue;
+        }
+
 #ifndef DISABLE_GUI
-        if (AddNewTorrentDialog::isEnabled())
-            AddNewTorrentDialog::show(param, m_window);
+        // There are two circumstances in which we want to show the torrent
+        // dialog. One is when the application settings specify that it should
+        // be shown and skipTorrentDialog is undefined. The other is when
+        // skipTorrentDialog is false, meaning that the application setting
+        // should be overridden.
+        const bool showDialogForThisTorrent =
+            ((AddNewTorrentDialog::isEnabled() && skipTorrentDialog == TriStateBool::Undefined)
+             || skipTorrentDialog == TriStateBool::False);
+        if (showDialogForThisTorrent)
+            AddNewTorrentDialog::show(param, torrentParams, m_window);
         else
 #endif
-            BitTorrent::Session::instance()->addTorrent(param);
+            BitTorrent::Session::instance()->addTorrent(param, torrentParams);
     }
 }
 
@@ -415,6 +485,9 @@ int Application::exec(const QStringList &params)
     m_webui = new WebUI;
 #endif
 
+    new RSS::Session; // create RSS::Session singleton
+    new RSS::AutoDownloader; // create RSS::AutoDownloader singleton
+
 #ifdef DISABLE_GUI
 #ifndef DISABLE_WEBUI
     Preferences* const pref = Preferences::instance();
@@ -438,6 +511,9 @@ int Application::exec(const QStringList &params)
         processParams(m_paramsQueue);
         m_paramsQueue.clear();
     }
+
+    // Now UI is ready to process signals from Session
+    BitTorrent::Session::instance()->startUpTorrents();
 
     return BaseApplication::exec();
 }
@@ -603,6 +679,9 @@ void Application::cleanup()
     delete m_webui;
 #endif
 
+    delete RSS::AutoDownloader::instance();
+    delete RSS::Session::instance();
+
     ScanFoldersModel::freeInstance();
     BitTorrent::Session::freeInstance();
 #ifndef DISABLE_COUNTRIES_RESOLUTION
@@ -632,4 +711,13 @@ void Application::cleanup()
         qDebug() << "Sending computer shutdown/suspend/hibernate signal...";
         Utils::Misc::shutdownComputer(m_shutdownAct);
     }
+}
+
+void Application::validateCommandLineParameters()
+{
+    if (m_commandLineArgs.portableMode && !m_commandLineArgs.profileDir.isEmpty())
+        throw CommandLineParameterError(tr("Portable mode and explicit profile directory options are mutually exclusive"));
+
+    if (m_commandLineArgs.portableMode && m_commandLineArgs.relativeFastresumePaths)
+        Logger::instance()->addMessage(tr("Portable mode implies relative fastresume"), Log::WARNING);
 }

@@ -46,23 +46,24 @@ enum PropColumn
     PCSIZE,
     PROGRESS,
     PRIORITY,
-    REMAINING
+    REMAINING,
+    AVAILABILITY
 };
 
-class PropListDelegate : public QItemDelegate
+class PropListDelegate: public QItemDelegate
 {
     Q_OBJECT
 
 public:
-    PropListDelegate(PropertiesWidget *properties = 0, QObject *parent = 0);
+    PropListDelegate(PropertiesWidget *properties);
 
-    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const;
-    void setEditorData(QWidget *editor, const QModelIndex &index) const;
-    QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &/* option */, const QModelIndex &index) const;
+    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
+    void setEditorData(QWidget *editor, const QModelIndex &index) const override;
+    QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem & /* option */, const QModelIndex &index) const override;
 
 public slots:
-    void setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const;
-    void updateEditorGeometry(QWidget *editor, const QStyleOptionViewItem &option, const QModelIndex &/* index */) const;
+    void setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const override;
+    void updateEditorGeometry(QWidget *editor, const QStyleOptionViewItem &option, const QModelIndex & /* index */) const override;
 
 signals:
     void filteredFilesChanged() const;
@@ -72,3 +73,4 @@ private:
 };
 
 #endif
+

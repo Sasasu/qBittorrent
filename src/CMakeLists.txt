@@ -2,6 +2,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_STANDARD "11")
 add_definitions(-DBOOST_NO_CXX11_RVALUE_REFERENCES)
 
+include(MacroQbtCompilerSettings)
+qbt_set_compiler_options()
+
 include(MacroLinkQtComponents)
 include(QbtTargetSources)
 
@@ -10,13 +13,25 @@ find_package(LibtorrentRasterbar REQUIRED)
 # Qt
 list(APPEND QBT_QT_COMPONENTS Core Network Xml)
 if (GUI)
-    list (APPEND QBT_QT_COMPONENTS Concurrent Gui Widgets)
+    list (APPEND QBT_QT_COMPONENTS Concurrent Gui Svg Widgets)
+    if (WIN32)
+        list (APPEND QBT_QT_COMPONENTS WinExtras)
+    endif(WIN32)
+    if (APPLE)
+        list (APPEND QBT_GUI_OPTIONAL_LINK_LIBRARIES objc)
+        list (APPEND QBT_QT_COMPONENTS MacExtras)
+    endif (APPLE)
 endif (GUI)
 if (DBUS)
     list (APPEND QBT_QT_COMPONENTS DBus)
 endif (DBUS)
 find_package(Qt5 5.5.1 COMPONENTS ${QBT_QT_COMPONENTS} REQUIRED)
 
+if (GUI AND APPLE)
+    # Fix MOC inability to detect macOS. This seems to only affect cmake.
+    # Relevant issue: https://bugreports.qt.io/browse/QTBUG-58325
+    set(CMAKE_AUTOMOC_MOC_OPTIONS ${CMAKE_AUTOMOC_MOC_OPTIONS} -DQ_OS_MAC)
+endif ()
 
 set(CMAKE_AUTOMOC True)
 list(APPEND CMAKE_AUTORCC_OPTIONS -compress 9 -threshold 5)
@@ -68,13 +83,6 @@ set(QBT_USE_GUI ${GUI})
 set(QBT_USE_WEBUI ${WEBUI})
 
 configure_file(config.h.cmakein ${CMAKE_CURRENT_BINARY_DIR}/config.h)
-
-if (GUI)
-    set(QBT_TARGET_NAME qbittorrent)
-else (GUI)
-    set(QBT_TARGET_NAME qbittorrent-nox)
-endif (GUI)
-
 
 if (SYSTEM_QTSINGLEAPPLICATION)
     find_package(QtSingleApplication REQUIRED)

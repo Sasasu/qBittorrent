@@ -91,6 +91,7 @@ namespace BitTorrent
         QByteArray metadata() const;
         QStringList filesForPiece(int pieceIndex) const;
         QVector<int> fileIndicesForPiece(int pieceIndex) const;
+        QVector<QByteArray> pieceHashes() const;
 
         using PieceRange = IndexRange<int>;
         // returns pair of the first and the last pieces into which
@@ -99,6 +100,7 @@ namespace BitTorrent
         PieceRange filePieces(int fileIndex) const;
 
         void renameFile(uint index, const QString &newPath);
+        void stripRootFolder();
 
         NativePtr nativeInfo() const;
 

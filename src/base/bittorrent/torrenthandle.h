@@ -30,12 +30,13 @@
 #ifndef BITTORRENT_TORRENTHANDLE_H
 #define BITTORRENT_TORRENTHANDLE_H
 
-#include <QObject>
-#include <QString>
 #include <QDateTime>
-#include <QQueue>
-#include <QVector>
 #include <QHash>
+#include <QObject>
+#include <QQueue>
+#include <QSet>
+#include <QString>
+#include <QVector>
 
 #include <libtorrent/torrent_handle.hpp>
 #include <libtorrent/version.hpp>
@@ -93,17 +94,21 @@ namespace BitTorrent
         // for both new and resumed torrents
         QString name;
         QString category;
+        QSet<QString> tags;
         QString savePath;
         bool disableTempPath;
         bool sequential;
+        bool firstLastPiecePriority;
         bool hasSeedStatus;
         bool skipChecking;
-        TriStateBool addForced;
-        TriStateBool addPaused;
+        bool hasRootFolder;
+        bool addForced;
+        bool addPaused;
         // for new torrents
         QVector<int> filePriorities;
         // for resumed torrents
         qreal ratioLimit;
+        int seedingTimeLimit;
 
         AddTorrentData();
         AddTorrentData(const AddTorrentParams &params);
@@ -138,7 +143,9 @@ namespace BitTorrent
             CheckingUploading,
             CheckingDownloading,
 
+#if LIBTORRENT_VERSION_NUM < 10100
             QueuedForChecking,
+#endif
             CheckingResumeData,
 
             PausedDownloading,
@@ -165,7 +172,11 @@ namespace BitTorrent
         static const qreal USE_GLOBAL_RATIO;
         static const qreal NO_RATIO_LIMIT;
 
+        static const int USE_GLOBAL_SEEDING_TIME;
+        static const int NO_SEEDING_TIME_LIMIT;
+
         static const qreal MAX_RATIO;
+        static const int MAX_SEEDING_TIME;
 
         TorrentHandle(Session *session, const libtorrent::torrent_handle &nativeHandle,
                           const AddTorrentData &data);
@@ -206,6 +217,9 @@ namespace BitTorrent
         //    file4
         //
         //
+        // Torrent A* (Torrent A in "strip root folder" mode)
+        //
+        //
         // Torrent B (singlefile)
         //
         // torrentB/
@@ -222,6 +236,7 @@ namespace BitTorrent
         // |   |           rootPath           |                contentPath                 |
         // |---|------------------------------|--------------------------------------------|
         // | A | /home/user/torrents/torrentA | /home/user/torrents/torrentA               |
+        // | A*|           <empty>            | /home/user/torrents                        |
         // | B | /home/user/torrents/torrentB | /home/user/torrents/torrentB/subdir1/file1 |
         // | C | /home/user/torrents/file1    | /home/user/torrents/file1                  |
 
@@ -235,12 +250,21 @@ namespace BitTorrent
         bool belongsToCategory(const QString &category) const;
         bool setCategory(const QString &category);
 
+        QSet<QString> tags() const;
+        bool hasTag(const QString &tag) const;
+        bool addTag(const QString &tag);
+        bool removeTag(const QString &tag);
+        void removeAllTags();
+
+        bool hasRootFolder() const;
+
         int filesCount() const;
         int piecesCount() const;
         int piecesHave() const;
         qreal progress() const;
         QDateTime addedTime() const;
         qreal ratioLimit() const;
+        int seedingTimeLimit() const;
 
         QString filePath(int index) const;
         QString fileName(int index) const;
@@ -303,6 +327,7 @@ namespace BitTorrent
         QVector<int> pieceAvailability() const;
         qreal distributedCopies() const;
         qreal maxRatio(bool *usesGlobalRatio = 0) const;
+        int maxSeedingTime(bool *usesGlobalSeedingTime = 0) const;
         qreal realRatio() const;
         int uploadPayloadRate() const;
         int downloadPayloadRate() const;
@@ -323,12 +348,15 @@ namespace BitTorrent
         void forceReannounce(int index = -1);
         void forceDHTAnnounce();
         void forceRecheck();
+#if LIBTORRENT_VERSION_NUM < 10100
         void setTrackerLogin(const QString &username, const QString &password);
+#endif
         void renameFile(int index, const QString &name);
         bool saveTorrentFile(const QString &path);
         void prioritizeFiles(const QVector<int> &priorities);
         void setFilePriority(int index, int priority);
         void setRatioLimit(qreal limit);
+        void setSeedingTimeLimit(int limit);
         void setUploadLimit(int limit);
         void setDownloadLimit(int limit);
         void setSuperSeeding(bool enable);
@@ -352,6 +380,14 @@ namespace BitTorrent
         void handleCategorySavePathChanged();
         void handleAppendExtensionToggled();
         void saveResumeData(bool updateStatus = false);
+
+        /**
+         * @brief fraction of file pieces that are available at least from one peer
+         *
+         * This is not the same as torrrent availability, it is just a fraction of pieces
+         * that can be downloaded right now. It varies between 0 to 1.
+         */
+        QVector<qreal> availableFileFractions() const;
 
     private:
         typedef boost::function<void ()> EventTrigger;
@@ -395,7 +431,7 @@ namespace BitTorrent
         Session *const m_session;
         libtorrent::torrent_handle m_nativeHandle;
         libtorrent::torrent_status m_nativeStatus;
-        TorrentState  m_state;
+        TorrentState m_state;
         TorrentInfo m_torrentInfo;
         SpeedMonitor m_speedMonitor;
 
@@ -417,10 +453,14 @@ namespace BitTorrent
         QString m_name;
         QString m_savePath;
         QString m_category;
+        QSet<QString> m_tags;
         bool m_hasSeedStatus;
         qreal m_ratioLimit;
+        int m_seedingTimeLimit;
         bool m_tempPathDisabled;
         bool m_hasMissingFiles;
+        bool m_hasRootFolder;
+        bool m_needsToSetFirstLastPiecePriority;
 
         bool m_pauseAfterRecheck;
         bool m_needSaveResumeData;

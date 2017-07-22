@@ -2,7 +2,6 @@ INCLUDEPATH += $$PWD
 
 include(lineedit/lineedit.pri)
 include(properties/properties.pri)
-include(rss/rss.pri)
 include(powermanagement/powermanagement.pri)
 unix:!macx:dbus: include(qtnotify/qtnotify.pri)
 
@@ -20,7 +19,6 @@ HEADERS += \
     $$PWD/torrentcontenttreeview.h \
     $$PWD/deletionconfirmationdlg.h \
     $$PWD/statusbar.h \
-    $$PWD/ico.h \
     $$PWD/speedlimitdlg.h \
     $$PWD/about_imp.h \
     $$PWD/previewselect.h \
@@ -51,12 +49,22 @@ HEADERS += \
     $$PWD/cookiesmodel.h \
     $$PWD/cookiesdialog.h \
     $$PWD/categoryfiltermodel.h \
+    $$PWD/categoryfilterproxymodel.h \
     $$PWD/categoryfilterwidget.h \
-    $$PWD/banlistoptions.h
+    $$PWD/tagfiltermodel.h \
+    $$PWD/tagfilterproxymodel.h \
+    $$PWD/tagfilterwidget.h \
+    $$PWD/banlistoptions.h \
+    $$PWD/rss/rsswidget.h \
+    $$PWD/rss/articlelistwidget.h \
+    $$PWD/rss/feedlistwidget.h \
+    $$PWD/rss/automatedrssdownloader.h \
+    $$PWD/rss/htmlbrowser.h \
+    $$PWD/fspathedit.h \
+    $$PWD/fspathedit_p.h \
 
 SOURCES += \
     $$PWD/mainwindow.cpp \
-    $$PWD/ico.cpp \
     $$PWD/transferlistwidget.cpp \
     $$PWD/transferlistsortmodel.cpp \
     $$PWD/transferlistdelegate.cpp \
@@ -94,8 +102,19 @@ SOURCES += \
     $$PWD/cookiesmodel.cpp \
     $$PWD/cookiesdialog.cpp \
     $$PWD/categoryfiltermodel.cpp \
+    $$PWD/categoryfilterproxymodel.cpp \
     $$PWD/categoryfilterwidget.cpp \
-    $$PWD/banlistoptions.cpp
+    $$PWD/tagfiltermodel.cpp \
+    $$PWD/tagfilterproxymodel.cpp \
+    $$PWD/tagfilterwidget.cpp \
+    $$PWD/banlistoptions.cpp \
+    $$PWD/rss/rsswidget.cpp \
+    $$PWD/rss/articlelistwidget.cpp \
+    $$PWD/rss/feedlistwidget.cpp \
+    $$PWD/rss/automatedrssdownloader.cpp \
+    $$PWD/rss/htmlbrowser.cpp \
+    $$PWD/fspathedit.cpp \
+    $$PWD/fspathedit_p.cpp
 
 win32|macx {
     HEADERS += $$PWD/programupdater.h
@@ -123,6 +142,8 @@ FORMS += \
     $$PWD/search/pluginsourcedlg.ui \
     $$PWD/search/searchtab.ui \
     $$PWD/cookiesdialog.ui \
-    $$PWD/banlistoptions.ui
+    $$PWD/banlistoptions.ui \
+    $$PWD/rss/rsswidget.ui \
+    $$PWD/rss/automatedrssdownloader.ui
 
 RESOURCES += $$PWD/about.qrc

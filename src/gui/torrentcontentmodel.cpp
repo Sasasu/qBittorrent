@@ -29,7 +29,18 @@
  */
 
 #include <QDir>
+#include <QFileIconProvider>
+#include <QFileInfo>
 #include <QIcon>
+
+#ifdef Q_OS_WIN
+#include <Windows.h>
+#include <Shellapi.h>
+#include <QtWin>
+#else
+#include <QMimeDatabase>
+#include <QMimeType>
+#endif
 
 #include "guiiconprovider.h"
 #include "base/utils/misc.h"
@@ -47,21 +58,97 @@ namespace
         return cached;
     }
 
-    QIcon getFileIcon()
+    class UnifiedFileIconProvider: public QFileIconProvider
     {
-        static QIcon cached = GuiIconProvider::instance()->getIcon("text-plain");
-        return cached;
+    public:
+        using QFileIconProvider::icon;
+        QIcon icon(const QFileInfo &info) const override
+        {
+            Q_UNUSED(info);
+            static QIcon cached = GuiIconProvider::instance()->getIcon("text-plain");
+            return cached;
+        }
+    };
+#ifdef Q_OS_WIN
+    // See QTBUG-25319 for explanation why this is required
+    class WinShellFileIconProvider: public UnifiedFileIconProvider
+    {
+    public:
+        using QFileIconProvider::icon;
+        QIcon icon(const QFileInfo &info) const override
+        {
+            SHFILEINFO sfi = { 0 };
+            HRESULT hr = ::SHGetFileInfoW(info.absoluteFilePath().toStdWString().c_str(),
+                FILE_ATTRIBUTE_NORMAL, &sfi, sizeof(sfi), SHGFI_ICON | SHGFI_USEFILEATTRIBUTES);
+            if (FAILED(hr))
+                return UnifiedFileIconProvider::icon(info);
+
+            QPixmap iconPixmap = QtWin::fromHICON(sfi.hIcon);
+            ::DestroyIcon(sfi.hIcon);
+            return QIcon(iconPixmap);
+        }
+    };
+#else
+    /**
+     * @brief Tests whether QFileIconProvider actually works
+     *
+     * Some QPA plugins do not implement QPlatformTheme::fileIcon(), and
+     * QFileIconProvider::icon() returns empty icons as the result. Here we ask it for
+     * two icons for probably absent files and when both icons are null, we assume that
+     * the current QPA plugin does not implement QPlatformTheme::fileIcon().
+     */
+    bool doesQFileIconProviderWork()
+    {
+        QFileIconProvider provider;
+        const char PSEUDO_UNIQUE_FILE_NAME[] = "/tmp/qBittorrent-test-QFileIconProvider-845eb448-7ad5-4cdb-b764-b3f322a266a9";
+        QIcon testIcon1 = provider.icon(QFileInfo(
+            QLatin1String(PSEUDO_UNIQUE_FILE_NAME) + QLatin1String(".pdf")));
+        QIcon testIcon2 = provider.icon(QFileInfo(
+            QLatin1String(PSEUDO_UNIQUE_FILE_NAME) + QLatin1String(".png")));
+
+        return (!testIcon1.isNull() || !testIcon2.isNull());
     }
+
+    class MimeFileIconProvider: public UnifiedFileIconProvider
+    {
+        using QFileIconProvider::icon;
+        QIcon icon(const QFileInfo &info) const override
+        {
+            const QMimeType mimeType = m_db.mimeTypeForFile(info, QMimeDatabase::MatchExtension);
+            QIcon res = QIcon::fromTheme(mimeType.iconName());
+            if (!res.isNull()) {
+                return res;
+            }
+
+            res = QIcon::fromTheme(mimeType.genericIconName());
+            if (!res.isNull()) {
+                return res;
+            }
+
+            return UnifiedFileIconProvider::icon(info);
+        }
+
+    private:
+        QMimeDatabase m_db;
+    };
+#endif
 }
 
 TorrentContentModel::TorrentContentModel(QObject *parent)
     : QAbstractItemModel(parent)
-    , m_rootItem(new TorrentContentModelFolder(QList<QVariant>({ tr("Name"), tr("Size"), tr("Progress"), tr("Download Priority"), tr("Remaining") })))
+    , m_rootItem(new TorrentContentModelFolder(QList<QVariant>({ tr("Name"), tr("Size"), tr("Progress"), tr("Download Priority"), tr("Remaining"), tr("Availability") })))
 {
+#ifdef Q_OS_WIN
+    m_fileIconProvider = new WinShellFileIconProvider();
+#else
+    static bool doesBuiltInProviderWork = doesQFileIconProviderWork();
+    m_fileIconProvider = doesBuiltInProviderWork ? new QFileIconProvider() : new MimeFileIconProvider();
+#endif
 }
 
 TorrentContentModel::~TorrentContentModel()
 {
+    delete m_fileIconProvider;
     delete m_rootItem;
 }
 
@@ -76,19 +163,34 @@ void TorrentContentModel::updateFilesProgress(const QVector<qreal> &fp)
         m_filesIndex[i]->setProgress(fp[i]);
     // Update folders progress in the tree
     m_rootItem->recalculateProgress();
+    m_rootItem->recalculateAvailability();
     emit dataChanged(index(0, 0), index(rowCount(), columnCount()));
 }
 
 void TorrentContentModel::updateFilesPriorities(const QVector<int> &fprio)
 {
-    Q_ASSERT(m_filesIndex.size() == (int)fprio.size());
+    Q_ASSERT(m_filesIndex.size() == fprio.size());
     // XXX: Why is this necessary?
-    if (m_filesIndex.size() != (int)fprio.size())
+    if (m_filesIndex.size() != fprio.size())
         return;
 
     emit layoutAboutToBeChanged();
     for (int i = 0; i < fprio.size(); ++i)
         m_filesIndex[i]->setPriority(fprio[i]);
+    emit dataChanged(index(0, 0), index(rowCount(), columnCount()));
+}
+
+void TorrentContentModel::updateFilesAvailability(const QVector<qreal> &fa)
+{
+    Q_ASSERT(m_filesIndex.size() == fa.size());
+    // XXX: Why is this necessary?
+    if (m_filesIndex.size() != fa.size()) return;
+
+    emit layoutAboutToBeChanged();
+    for (int i = 0; i < fa.size(); ++i)
+        m_filesIndex[i]->setAvailability(fa[i]);
+    // Update folders progress in the tree
+    m_rootItem->recalculateProgress();
     emit dataChanged(index(0, 0), index(rowCount(), columnCount()));
 }
 
@@ -134,6 +236,7 @@ bool TorrentContentModel::setData(const QModelIndex& index, const QVariant& valu
                 item->setPriority(prio::NORMAL);
             // Update folders progress in the tree
             m_rootItem->recalculateProgress();
+            m_rootItem->recalculateAvailability();
             emit dataChanged(this->index(0, 0), this->index(rowCount() - 1, columnCount() - 1));
             emit filteredFilesChanged();
         }
@@ -186,7 +289,7 @@ QVariant TorrentContentModel::data(const QModelIndex& index, int role) const
         if (item->itemType() == TorrentContentModelItem::FolderType)
             return getDirectoryIcon();
         else
-            return getFileIcon();
+            return m_fileIconProvider->icon(QFileInfo(item->name()));
     }
 
     if ((index.column() == TorrentContentModelItem::COL_NAME) && (role == Qt::CheckStateRole)) {

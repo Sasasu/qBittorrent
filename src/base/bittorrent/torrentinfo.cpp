@@ -186,7 +186,7 @@ qlonglong TorrentInfo::fileSize(int index) const
 qlonglong TorrentInfo::fileOffset(int index) const
 {
     if (!isValid()) return -1;
-    return m_nativeInfo->file_at(index).offset;
+    return m_nativeInfo->files().file_offset(index);
 }
 
 QList<TrackerEntry> TorrentInfo::trackers() const
@@ -246,6 +246,21 @@ QVector<int> TorrentInfo::fileIndicesForPiece(int pieceIndex) const
     return res;
 }
 
+QVector<QByteArray> TorrentInfo::pieceHashes() const
+{
+    if (!isValid())
+        return {};
+
+    const int count = piecesCount();
+    QVector<QByteArray> hashes;
+    hashes.reserve(count);
+
+    for (int i = 0; i < count; ++i)
+        hashes += { m_nativeInfo->hash_for_piece_ptr(i), libtorrent::sha1_hash::size };
+
+    return hashes;
+}
+
 TorrentInfo::PieceRange TorrentInfo::filePieces(const QString& file) const
 {
     if (!isValid()) // if we do not check here the debug message will be printed, which would be not correct
@@ -279,7 +294,7 @@ TorrentInfo::PieceRange TorrentInfo::filePieces(int fileIndex) const
 void TorrentInfo::renameFile(uint index, const QString &newPath)
 {
     if (!isValid()) return;
-    nativeInfo()->rename_file(index, newPath.toStdString());
+    nativeInfo()->rename_file(index, Utils::Fs::toNativePath(newPath).toStdString());
 }
 
 int BitTorrent::TorrentInfo::fileIndex(const QString& fileName) const
@@ -291,6 +306,24 @@ int BitTorrent::TorrentInfo::fileIndex(const QString& fileName) const
             return i;
 
     return -1;
+}
+
+void TorrentInfo::stripRootFolder()
+{
+    if (filesCount() <= 1) return;
+
+    libtorrent::file_storage files = m_nativeInfo->files();
+
+    // Solution for case of renamed root folder
+    std::string testName = filePath(0).split('/').value(0).toStdString();
+    if (files.name() != testName) {
+        files.set_name(testName);
+        for (int i = 0; i < files.num_files(); ++i)
+            files.rename_file(i, files.file_path(i));
+    }
+
+    files.set_name("");
+    m_nativeInfo->remap_files(files);
 }
 
 TorrentInfo::NativePtr TorrentInfo::nativeInfo() const

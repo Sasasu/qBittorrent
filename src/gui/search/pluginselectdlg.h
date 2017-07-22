@@ -32,12 +32,20 @@
 #ifndef PLUGINSELECTDLG_H
 #define PLUGINSELECTDLG_H
 
-#include "ui_pluginselectdlg.h"
+#include <QDialog>
+
+#include "base/searchengine.h"
 
 class QDropEvent;
-class SearchEngine;
+class QStringList;
+class QTreeWidgetItem;
 
-class PluginSelectDlg: public QDialog, private Ui::PluginSelectDlg
+namespace Ui
+{
+    class PluginSelectDlg;
+}
+
+class PluginSelectDlg: public QDialog
 {
     Q_OBJECT
 
@@ -47,9 +55,6 @@ public:
 
     QList<QTreeWidgetItem*> findItemsWithUrl(QString url);
     QTreeWidgetItem* findItemWithID(QString id);
-
-signals:
-    void pluginsChanged();
 
 protected:
     void dropEvent(QDropEvent *event);
@@ -69,7 +74,7 @@ private slots:
     void iconDownloaded(const QString &url, QString filePath);
     void iconDownloadFailed(const QString &url, const QString &reason);
 
-    void checkForUpdatesFinished(const QHash<QString, qreal> &updateInfo);
+    void checkForUpdatesFinished(const QHash<QString, PluginVersion> &updateInfo);
     void checkForUpdatesFailed(const QString &reason);
     void pluginInstalled(const QString &name);
     void pluginInstallationFailed(const QString &name, const QString &reason);
@@ -81,9 +86,13 @@ private:
     void addNewPlugin(QString pluginName);
     void startAsyncOp();
     void finishAsyncOp();
+    void finishPluginUpdate();
 
+    Ui::PluginSelectDlg *m_ui;
     SearchEngine *m_pluginManager;
+    QStringList m_updatedPlugins;
     int m_asyncOps;
+    int m_pendingUpdates;
 };
 
 #endif // PLUGINSELECTDLG_H

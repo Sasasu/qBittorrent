@@ -166,7 +166,7 @@ PKG_CHECK_MODULES(libtorrent,
                   LIBS="$libtorrent_LIBS $LIBS"])
 
 PKG_CHECK_MODULES(zlib,
-                 [zlib],
+                 [zlib >= 1.2.5.2],
                  [CPPFLAGS="$zlib_CFLAGS $CPPFLAGS"
                  LIBS="$zlib_LIBS $LIBS"])
 
@@ -218,7 +218,7 @@ AC_SUBST(QBT_REMOVE_DEFINES)
 
 AC_OUTPUT(conf.pri)
 AS_IF([test "x$enable_systemd" = "xyes"],
-      [AC_OUTPUT(dist/unix/systemd/qbittorrent-nox.service)])
+      [AC_OUTPUT(dist/unix/systemd/qbittorrent-nox@.service)])
 
 
 

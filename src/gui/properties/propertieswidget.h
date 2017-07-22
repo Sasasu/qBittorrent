@@ -33,9 +33,8 @@
 
 #include <QShortcut>
 #include <QWidget>
-#include "ui_propertieswidget.h"
-#include "base/bittorrent/torrenthandle.h"
 
+#include "base/bittorrent/torrenthandle.h"
 
 class TransferListWidget;
 class TorrentContentFilterModel;
@@ -52,25 +51,45 @@ class LineEdit;
 
 QT_BEGIN_NAMESPACE
 class QAction;
+class QPushButton;
 class QTimer;
+class QTreeView;
 QT_END_NAMESPACE
 
-class PropertiesWidget: public QWidget, private Ui::PropertiesWidget
+namespace Ui
+{
+    class PropertiesWidget;
+}
+
+class PropertiesWidget: public QWidget
 {
     Q_OBJECT
     Q_DISABLE_COPY(PropertiesWidget)
 
 public:
-    enum SlideState {REDUCED, VISIBLE};
+    enum SlideState
+    {
+        REDUCED,
+        VISIBLE
+    };
 
-public:
     PropertiesWidget(QWidget *parent, MainWindow *main_window, TransferListWidget *transferList);
     ~PropertiesWidget();
     BitTorrent::TorrentHandle *getCurrentTorrent() const;
     TrackerList *getTrackerList() const { return trackerList; }
     PeerListWidget *getPeerList() const { return peersList; }
-    QTreeView *getFilesList() const { return filesList; }
+    QTreeView *getFilesList() const;
     SpeedWidget *getSpeedWidget() const { return speedWidget; }
+
+public slots:
+    void setVisibility(bool visible);
+    void loadDynamicData();
+    void clear();
+    void readSettings();
+    void saveSettings();
+    void reloadPreferences();
+    void openDoubleClickedFile(const QModelIndex &);
+    void loadTrackers(BitTorrent::TorrentHandle *const torrent);
 
 protected:
     QPushButton *getButtonFromIndex(int index);
@@ -92,21 +111,11 @@ protected slots:
     void renameSelectedFile();
     void openSelectedFile();
 
-public slots:
-    void setVisibility(bool visible);
-    void loadDynamicData();
-    void clear();
-    void readSettings();
-    void saveSettings();
-    void reloadPreferences();
-    void openDoubleClickedFile(const QModelIndex &);
-    void loadTrackers(BitTorrent::TorrentHandle *const torrent);
-
 private:
     void openFile(const QModelIndex &index);
     void openFolder(const QModelIndex &index, bool containing_folder);
 
-private:
+    Ui::PropertiesWidget *m_ui;
     TransferListWidget *transferList;
     MainWindow *main_window;
     BitTorrent::TorrentHandle *m_torrent;

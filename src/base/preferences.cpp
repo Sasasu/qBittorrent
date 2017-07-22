@@ -161,6 +161,9 @@ void Preferences::setHideZeroComboValues(int n)
     setValue("Preferences/General/HideZeroComboValues", n);
 }
 
+// In Mac OS X the dock is sufficient for our needs so we disable the sys tray functionality.
+// See extensive discussion in https://github.com/qbittorrent/qBittorrent/pull/3018
+#ifndef Q_OS_MAC
 bool Preferences::systrayIntegration() const
 {
     return value("Preferences/General/SystrayEnabled", true).toBool();
@@ -169,16 +172,6 @@ bool Preferences::systrayIntegration() const
 void Preferences::setSystrayIntegration(bool enabled)
 {
     setValue("Preferences/General/SystrayEnabled", enabled);
-}
-
-bool Preferences::isToolbarDisplayed() const
-{
-    return value("Preferences/General/ToolbarDisplayed", true).toBool();
-}
-
-void Preferences::setToolbarDisplayed(bool displayed)
-{
-    setValue("Preferences/General/ToolbarDisplayed", displayed);
 }
 
 bool Preferences::minimizeToTray() const
@@ -199,6 +192,27 @@ bool Preferences::closeToTray() const
 void Preferences::setCloseToTray(bool b)
 {
     setValue("Preferences/General/CloseToTray", b);
+}
+#endif
+
+bool Preferences::isToolbarDisplayed() const
+{
+    return value("Preferences/General/ToolbarDisplayed", true).toBool();
+}
+
+void Preferences::setToolbarDisplayed(bool displayed)
+{
+    setValue("Preferences/General/ToolbarDisplayed", displayed);
+}
+
+bool Preferences::isStatusbarDisplayed() const
+{
+    return value("Preferences/General/StatusbarDisplayed", true).toBool();
+}
+
+void Preferences::setStatusbarDisplayed(bool displayed)
+{
+    setValue("Preferences/General/StatusbarDisplayed", displayed);
 }
 
 bool Preferences::startMinimized() const
@@ -396,12 +410,12 @@ void Preferences::setSchedulerEndTime(const QTime &time)
 
 scheduler_days Preferences::getSchedulerDays() const
 {
-    return (scheduler_days)value("Preferences/Scheduler/days", EVERY_DAY).toInt();
+    return static_cast<scheduler_days>(value("Preferences/Scheduler/days", EVERY_DAY).toInt());
 }
 
 void Preferences::setSchedulerDays(scheduler_days days)
 {
-    setValue("Preferences/Scheduler/days", (int)days);
+    setValue("Preferences/Scheduler/days", static_cast<int>(days));
 }
 
 // Search
@@ -437,6 +451,16 @@ bool Preferences::isWebUiLocalAuthEnabled() const
 void Preferences::setWebUiLocalAuthEnabled(bool enabled)
 {
     setValue("Preferences/WebUI/LocalHostAuth", enabled);
+}
+
+QString Preferences::getServerDomains() const
+{
+    return value("Preferences/WebUI/ServerDomains", "*").toString();
+}
+
+void Preferences::setServerDomains(const QString &str)
+{
+    setValue("Preferences/WebUI/ServerDomains", str);
 }
 
 quint16 Preferences::getWebUiPort() const
@@ -1054,6 +1078,17 @@ void Preferences::setConfirmTorrentRecheck(bool enabled)
     setValue("Preferences/Advanced/confirmTorrentRecheck", enabled);
 }
 
+bool Preferences::confirmRemoveAllTags() const
+{
+    return value("Preferences/Advanced/confirmRemoveAllTags", true).toBool();
+}
+
+void Preferences::setConfirmRemoveAllTags(bool enabled)
+{
+    setValue("Preferences/Advanced/confirmRemoveAllTags", enabled);
+}
+
+#ifndef Q_OS_MAC
 TrayIcon::Style Preferences::trayIconStyle() const
 {
     return TrayIcon::Style(value("Preferences/Advanced/TrayIconStyle", TrayIcon::NORMAL).toInt());
@@ -1063,6 +1098,7 @@ void Preferences::setTrayIconStyle(TrayIcon::Style style)
 {
     setValue("Preferences/Advanced/TrayIconStyle", style);
 }
+#endif
 
 // Stuff that don't appear in the Options GUI but are saved
 // in the same file.
@@ -1127,7 +1163,6 @@ void Preferences::setMainLastDir(const QString &path)
     setValue("MainWindowLastDir", path);
 }
 
-#ifndef DISABLE_GUI
 QSize Preferences::getPrefSize(const QSize& defaultSize) const
 {
     return value("Preferences/State/size", defaultSize).toSize();
@@ -1136,17 +1171,6 @@ QSize Preferences::getPrefSize(const QSize& defaultSize) const
 void Preferences::setPrefSize(const QSize &size)
 {
     setValue("Preferences/State/size", size);
-}
-#endif
-
-QPoint Preferences::getPrefPos() const
-{
-    return value("Preferences/State/pos").toPoint();
-}
-
-void Preferences::setPrefPos(const QPoint &pos)
-{
-    setValue("Preferences/State/pos", pos);
 }
 
 QStringList Preferences::getPrefHSplitterSizes() const
@@ -1219,14 +1243,14 @@ void Preferences::setPropTrackerListState(const QByteArray &state)
     setValue("TorrentProperties/Trackers/qt5/TrackerListState", state);
 }
 
-QByteArray Preferences::getRssGeometry() const
+QSize Preferences::getRssGeometrySize(const QSize &defaultSize) const
 {
-    return value("RssFeedDownloader/geometry").toByteArray();
+    return value("RssFeedDownloader/geometrySize", defaultSize).toSize();
 }
 
-void Preferences::setRssGeometry(const QByteArray &geometry)
+void Preferences::setRssGeometrySize(const QSize &geometry)
 {
-    setValue("RssFeedDownloader/geometry", geometry);
+    setValue("RssFeedDownloader/geometrySize", geometry);
 }
 
 QByteArray Preferences::getRssHSplitterSizes() const
@@ -1241,32 +1265,32 @@ void Preferences::setRssHSplitterSizes(const QByteArray &sizes)
 
 QStringList Preferences::getRssOpenFolders() const
 {
-    return value("Rss/open_folders").toStringList();
+    return value("GUI/RSSWidget/OpenedFolders").toStringList();
 }
 
 void Preferences::setRssOpenFolders(const QStringList &folders)
 {
-    setValue("Rss/open_folders", folders);
+    setValue("GUI/RSSWidget/OpenedFolders", folders);
 }
 
 QByteArray Preferences::getRssSideSplitterState() const
 {
-    return value("Rss/qt5/splitter_h").toByteArray();
+    return value("GUI/RSSWidget/qt5/splitter_h").toByteArray();
 }
 
 void Preferences::setRssSideSplitterState(const QByteArray &state)
 {
-    setValue("Rss/qt5/splitter_h", state);
+    setValue("GUI/RSSWidget/qt5/splitter_h", state);
 }
 
 QByteArray Preferences::getRssMainSplitterState() const
 {
-    return value("Rss/qt5/splitterMain").toByteArray();
+    return value("GUI/RSSWidget/qt5/splitterMain").toByteArray();
 }
 
 void Preferences::setRssMainSplitterState(const QByteArray &state)
 {
-    setValue("Rss/qt5/splitterMain", state);
+    setValue("GUI/RSSWidget/qt5/splitterMain", state);
 }
 
 QByteArray Preferences::getSearchTabHeaderState() const
@@ -1287,56 +1311,6 @@ QStringList Preferences::getSearchEngDisabled() const
 void Preferences::setSearchEngDisabled(const QStringList &engines)
 {
     setValue("SearchEngines/disabledEngines", engines);
-}
-
-QString Preferences::getCreateTorLastAddPath() const
-{
-    return value("CreateTorrent/last_add_path", QDir::homePath()).toString();
-}
-
-void Preferences::setCreateTorLastAddPath(const QString &path)
-{
-    setValue("CreateTorrent/last_add_path", path);
-}
-
-QString Preferences::getCreateTorLastSavePath() const
-{
-    return value("CreateTorrent/last_save_path", QDir::homePath()).toString();
-}
-
-void Preferences::setCreateTorLastSavePath(const QString &path)
-{
-    setValue("CreateTorrent/last_save_path", path);
-}
-
-QString Preferences::getCreateTorTrackers() const
-{
-    return value("CreateTorrent/TrackerList").toString();
-}
-
-void Preferences::setCreateTorTrackers(const QString &path)
-{
-    setValue("CreateTorrent/TrackerList", path);
-}
-
-QByteArray Preferences::getCreateTorGeometry() const
-{
-    return value("CreateTorrent/dimensions").toByteArray();
-}
-
-void Preferences::setCreateTorGeometry(const QByteArray &geometry)
-{
-    setValue("CreateTorrent/dimensions", geometry);
-}
-
-bool Preferences::getCreateTorIgnoreRatio() const
-{
-    return value("CreateTorrent/IgnoreRatio").toBool();
-}
-
-void Preferences::setCreateTorIgnoreRatio(const bool ignore)
-{
-    setValue("CreateTorrent/IgnoreRatio", ignore);
 }
 
 QString Preferences::getTorImportLastContentDir() const
@@ -1379,6 +1353,16 @@ void Preferences::setCategoryFilterState(const bool checked)
     setValue("TransferListFilters/CategoryFilterState", checked);
 }
 
+bool Preferences::getTagFilterState() const
+{
+    return value("TransferListFilters/TagFilterState", true).toBool();
+}
+
+void Preferences::setTagFilterState(const bool checked)
+{
+    setValue("TransferListFilters/TagFilterState", checked);
+}
+
 bool Preferences::getTrackerFilterState() const
 {
     return value("TransferListFilters/trackerFilterState", true).toBool();
@@ -1410,64 +1394,14 @@ void Preferences::setTransHeaderState(const QByteArray &state)
 }
 
 //From old RssSettings class
-bool Preferences::isRSSEnabled() const
+bool Preferences::isRSSWidgetEnabled() const
 {
-    return value("Preferences/RSS/RSSEnabled", false).toBool();
+    return value("GUI/RSSWidget/Enabled", false).toBool();
 }
 
-void Preferences::setRSSEnabled(const bool enabled)
+void Preferences::setRSSWidgetVisible(const bool enabled)
 {
-    setValue("Preferences/RSS/RSSEnabled", enabled);
-}
-
-uint Preferences::getRSSRefreshInterval() const
-{
-    return value("Preferences/RSS/RSSRefresh", 30).toUInt();
-}
-
-void Preferences::setRSSRefreshInterval(const uint &interval)
-{
-    setValue("Preferences/RSS/RSSRefresh", interval);
-}
-
-int Preferences::getRSSMaxArticlesPerFeed() const
-{
-    return value("Preferences/RSS/RSSMaxArticlesPerFeed", 50).toInt();
-}
-
-void Preferences::setRSSMaxArticlesPerFeed(const int &nb)
-{
-    setValue("Preferences/RSS/RSSMaxArticlesPerFeed", nb);
-}
-
-bool Preferences::isRssDownloadingEnabled() const
-{
-    return value("Preferences/RSS/RssDownloading", true).toBool();
-}
-
-void Preferences::setRssDownloadingEnabled(const bool b)
-{
-    setValue("Preferences/RSS/RssDownloading", b);
-}
-
-QStringList Preferences::getRssFeedsUrls() const
-{
-    return value("Rss/streamList").toStringList();
-}
-
-void Preferences::setRssFeedsUrls(const QStringList &rssFeeds)
-{
-    setValue("Rss/streamList", rssFeeds);
-}
-
-QStringList Preferences::getRssFeedsAliases() const
-{
-    return value("Rss/streamAlias").toStringList();
-}
-
-void Preferences::setRssFeedsAliases(const QStringList &rssAliases)
-{
-    setValue("Rss/streamAlias", rssAliases);
+    setValue("GUI/RSSWidget/Enabled", enabled);
 }
 
 int Preferences::getToolbarTextPosition() const
@@ -1522,24 +1456,6 @@ void Preferences::setSpeedWidgetGraphEnable(int id, const bool enable)
 
 void Preferences::upgrade()
 {
-    // Move RSS cookies to global storage
-    QList<QNetworkCookie> cookies = getNetworkCookies();
-    QVariantMap hostsTable = value("Rss/hosts_cookies").toMap();
-    foreach (const QString &key, hostsTable.keys()) {
-        QVariant value = hostsTable[key];
-        QList<QByteArray> rawCookies = value.toByteArray().split(':');
-        foreach (const QByteArray &rawCookie, rawCookies) {
-            foreach (QNetworkCookie cookie, QNetworkCookie::parseCookies(rawCookie)) {
-                cookie.setDomain(key);
-                cookie.setPath("/");
-                cookie.setExpirationDate(QDateTime::currentDateTime().addYears(10));
-                cookies << cookie;
-            }
-        }
-    }
-
-    setNetworkCookies(cookies);
-
     QStringList labels = value("TransferListFilters/customLabels").toStringList();
     if (!labels.isEmpty()) {
         QVariantMap categories = value("BitTorrent/Session/Categories").toMap();
@@ -1551,7 +1467,6 @@ void Preferences::upgrade()
         SettingsStorage::instance()->removeValue("TransferListFilters/customLabels");
     }
 
-    SettingsStorage::instance()->removeValue("Rss/hosts_cookies");
     SettingsStorage::instance()->removeValue("Preferences/Downloads/AppendLabel");
 }
 

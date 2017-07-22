@@ -5188,12 +5188,12 @@ if test -n "$zlib_CFLAGS"; then
     pkg_cv_zlib_CFLAGS="$zlib_CFLAGS"
  elif test -n "$PKG_CONFIG"; then
     if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"zlib\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "zlib") 2>&5
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"zlib >= 1.2.5.2\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "zlib >= 1.2.5.2") 2>&5
   ac_status=$?
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_zlib_CFLAGS=`$PKG_CONFIG --cflags "zlib" 2>/dev/null`
+  pkg_cv_zlib_CFLAGS=`$PKG_CONFIG --cflags "zlib >= 1.2.5.2" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
@@ -5205,12 +5205,12 @@ if test -n "$zlib_LIBS"; then
     pkg_cv_zlib_LIBS="$zlib_LIBS"
  elif test -n "$PKG_CONFIG"; then
     if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"zlib\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "zlib") 2>&5
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"zlib >= 1.2.5.2\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "zlib >= 1.2.5.2") 2>&5
   ac_status=$?
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_zlib_LIBS=`$PKG_CONFIG --libs "zlib" 2>/dev/null`
+  pkg_cv_zlib_LIBS=`$PKG_CONFIG --libs "zlib >= 1.2.5.2" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
@@ -5231,14 +5231,14 @@ else
         _pkg_short_errors_supported=no
 fi
         if test $_pkg_short_errors_supported = yes; then
-	        zlib_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "zlib" 2>&1`
+	        zlib_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "zlib >= 1.2.5.2" 2>&1`
         else
-	        zlib_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "zlib" 2>&1`
+	        zlib_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "zlib >= 1.2.5.2" 2>&1`
         fi
 	# Put the nasty error message in config.log where it belongs
 	echo "$zlib_PKG_ERRORS" >&5
 
-	as_fn_error $? "Package requirements (zlib) were not met:
+	as_fn_error $? "Package requirements (zlib >= 1.2.5.2) were not met:
 
 $zlib_PKG_ERRORS
 
@@ -6689,7 +6689,7 @@ $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
 
 if test "x$enable_systemd" = "xyes"; then :
-  ac_config_files="$ac_config_files dist/unix/systemd/qbittorrent-nox.service"
+  ac_config_files="$ac_config_files dist/unix/systemd/qbittorrent-nox@.service"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -7443,7 +7443,7 @@ do
   case $ac_config_target in
     "depfiles") CONFIG_COMMANDS="$CONFIG_COMMANDS depfiles" ;;
     "conf.pri") CONFIG_FILES="$CONFIG_FILES conf.pri" ;;
-    "dist/unix/systemd/qbittorrent-nox.service") CONFIG_FILES="$CONFIG_FILES dist/unix/systemd/qbittorrent-nox.service" ;;
+    "dist/unix/systemd/qbittorrent-nox@.service") CONFIG_FILES="$CONFIG_FILES dist/unix/systemd/qbittorrent-nox@.service" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

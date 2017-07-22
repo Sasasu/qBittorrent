@@ -60,6 +60,8 @@ namespace Ui
 class OptionsDialog: public QDialog
 {
     Q_OBJECT
+    using ThisType = OptionsDialog;
+
 private:
     enum Tabs
     {
@@ -68,6 +70,7 @@ private:
         TAB_CONNECTION,
         TAB_SPEED,
         TAB_BITTORRENT,
+        TAB_RSS,
         TAB_WEBUI,
         TAB_ADVANCED
     };
@@ -81,12 +84,13 @@ public slots:
     void showConnectionTab();
 
 private slots:
-    void enableProxy(int comboIndex);
+    void enableProxy(int index);
     void on_buttonBox_accepted();
     void closeEvent(QCloseEvent *e);
     void on_buttonBox_rejected();
     void applySettings(QAbstractButton* button);
     void enableApplyButton();
+    void toggleComboRatioLimitAct();
     void changePage(QListWidgetItem*, QListWidgetItem*);
     void loadWindowState();
     void saveWindowState() const;
@@ -94,19 +98,13 @@ private slots:
     void on_IpFilterRefreshBtn_clicked();
     void handleIPFilterParsed(bool error, int ruleCount);
     void on_banListButton_clicked();
-    void on_browseFileLogDir_clicked();
-    void on_browseExportDirButton_clicked();
-    void on_browseExportDirFinButton_clicked();
-    void on_browseFilterButton_clicked();
-    void on_browseSaveDirButton_clicked();
-    void on_browseTempDirButton_clicked();
     void on_randomButton_clicked();
     void on_addScanFolderButton_clicked();
     void on_removeScanFolderButton_clicked();
     void on_btnWebUiCrt_clicked();
     void on_btnWebUiKey_clicked();
     void on_registerDNSBtn_clicked();
-    void setLocale(const QString &locale);
+    void setLocale(const QString &localeStr);
 
 private:
     // Methods
@@ -116,9 +114,11 @@ private:
     static QString languageToLocalizedString(const QLocale &locale);
     // General options
     QString getLocale() const;
+#ifndef Q_OS_MAC
     bool systrayIntegration() const;
     bool minimizeToTray() const;
     bool closeToTray() const;
+#endif
     bool startMinimized() const;
     bool isSlashScreenDisabled() const;
     bool preventFromSuspend() const;
@@ -148,6 +148,7 @@ private:
     bool isLSDEnabled() const;
     int getEncryptionSetting() const;
     qreal getMaxRatio() const;
+    int getMaxSeedingMinutes() const;
     // Proxy options
     bool isProxyEnabled() const;
     bool isProxyAuthEnabled() const;
@@ -169,7 +170,6 @@ private:
     quint16 webUiPort() const;
     QString webUiUsername() const;
     QString webUiPassword() const;
-    QSize sizeFittingScreen() const;
 
 private:
     bool setSslKey(const QByteArray &key);

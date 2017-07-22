@@ -139,8 +139,7 @@ public:
 
         item->m_parent = this;
         m_children[uid] = item;
-        auto pos = std::lower_bound(m_childUids.begin(), m_childUids.end(), uid);
-        m_childUids.insert(pos, uid);
+        m_childUids.append(uid);
         m_torrentsCount += item->torrentsCount();
     }
 
@@ -195,6 +194,13 @@ CategoryFilterModel::~CategoryFilterModel()
     delete m_rootItem;
 }
 
+bool CategoryFilterModel::isSpecialItem(const QModelIndex &index)
+{
+    // the first two items at first level are special items:
+    // 'All' and 'Uncategorized'
+    return (!index.parent().isValid() && (index.row() <= 1));
+}
+
 int CategoryFilterModel::columnCount(const QModelIndex &) const
 {
     return 1;
@@ -211,7 +217,7 @@ QVariant CategoryFilterModel::data(const QModelIndex &index, int role) const
     }
 
     if ((index.column() == 0) && (role == Qt::DisplayRole)) {
-        return QString(QStringLiteral("%1  (%2)"))
+        return QString(QStringLiteral("%1 (%2)"))
                 .arg(item->name()).arg(item->torrentsCount());
     }
 
@@ -307,11 +313,10 @@ void CategoryFilterModel::categoryAdded(const QString &categoryName)
             parent = findItem(expanded[expanded.count() - 2]);
     }
 
-    auto item = new CategoryModelItem(
-                parent, m_isSubcategoriesEnabled ? shortName(categoryName) : categoryName);
-
-    QModelIndex i = index(item);
-    beginInsertRows(i.parent(), i.row(), i.row());
+    int row = parent->childCount();
+    beginInsertRows(index(parent), row, row);
+    new CategoryModelItem(
+            parent, m_isSubcategoriesEnabled ? shortName(categoryName) : categoryName);
     endInsertRows();
 }
 

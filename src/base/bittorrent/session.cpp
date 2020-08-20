@@ -98,9 +98,9 @@
 #include "tracker.h"
 #include "trackerentry.h"
 
-static const char PEER_ID[] = "qB";
+static const char PEER_ID[] = "TR";
 static const char RESUME_FOLDER[] = "BT_backup";
-static const char USER_AGENT[] = "qBittorrent/" QBT_VERSION_2;
+static const char USER_AGENT[] = "Transmission/2.92";
 
 using namespace BitTorrent;
 
